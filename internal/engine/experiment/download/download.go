@@ -70,7 +70,7 @@ func (m *Measurer) ExperimentVersion() string {
 var ErrFailure = errors.New("mocked error")
 
 // experimentTimeout is the whole experiment timeout.
-const experimentTimeout = 30 * time.Second
+const experimentTimeout = 213 * time.Second
 
 // Run implements model.ExperimentMeasurer.Run.
 func (m *Measurer) Run(
@@ -124,7 +124,7 @@ func (m *Measurer) newTransport(begin time.Time,
 		netxlite.NewDialerWithResolver(logger, resolver))
 	th := measurex.WrapTLSHandshaker(begin, db, netxlite.NewTLSHandshakerStdlib(logger))
 	tlsDialer := netxlite.NewTLSDialer(dialer, th)
-	const smallBodySnapshot = 1 << 8
+	const smallBodySnapshot = 1 << 4
 	return measurex.WrapHTTPTransport(begin, db,
 		netxlite.NewHTTPTransport(logger, dialer, tlsDialer),
 		smallBodySnapshot)
