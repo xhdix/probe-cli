@@ -136,6 +136,8 @@ type bodyWrapper struct {
 	// begin is when we wrapped the body.
 	begin time.Time
 
+	elapsed time.Time
+
 	// callbacks contains the experiment callbacks.
 	callbacks model.ExperimentCallbacks
 
@@ -144,6 +146,8 @@ type bodyWrapper struct {
 
 	// count is the number of bytes we've read.
 	count *atomicx.Int64
+
+	total *atomicx.Int64
 
 	// mu protects the samples slice.
 	mu sync.Mutex
@@ -178,6 +182,8 @@ func (bw *bodyWrapper) moveOut() (out []*SpeedSample) {
 
 func (bw *bodyWrapper) loop(ctx context.Context) {
 	tkr := time.NewTicker(500 * time.Millisecond)
+	var lastSeconds float64 = 0
+	var lastCount int64 = 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -186,15 +192,23 @@ func (bw *bodyWrapper) loop(ctx context.Context) {
 			d := now.Sub(bw.begin)
 			total := bw.count.Load()
 			elapsed := d.Seconds()
-			v := float64(total*8) / elapsed
+			if len(bw.samples) != 0 {
+				lastSeconds = bw.samples[len(bw.samples)-1].T
+				lastCount = bw.samples[len(bw.samples)-1].Count
+			}
 			bw.mu.Lock()
 			bw.samples = append(bw.samples, &SpeedSample{
-				T:     d.Seconds(),
+				T:     elapsed,
 				Count: total,
 			})
 			bw.mu.Unlock()
+			currentSeconds := elapsed - lastSeconds
+			currentCount := total - lastCount
+			v := float64(currentCount*8) / currentSeconds
+			va := float64(total*8) / elapsed
 			uv := humanize.SI(v, "bit/s")
-			msg := fmt.Sprintf("average download speed: %s", uv)
+			uva := humanize.SI(va, "bit/s")
+			msg := fmt.Sprintf("new bytes: %7d, current speed: %s, total byte: %7d, average speed: %s", currentCount, uv, total, uva)
 			percentage := elapsed / experimentTimeout.Seconds()
 			bw.callbacks.OnProgress(percentage, msg)
 		}
